@@ -52,8 +52,8 @@
         const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0, 0], 2);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-        // Custom Heatmap Layer using Canvas
-        const HeatCanvasLayer = L.CanvasLayer = L.Layer.extend({
+        // Custom Heatmap Layer
+        const HeatCanvasLayer = L.Layer.extend({
             onAdd: function(map) {
                 this._map = map;
                 this._canvas = L.DomUtil.create('canvas', 'leaflet-heatmap-layer');
@@ -64,14 +64,16 @@
                 
                 this._heat = simpleheat(this._canvas);
                 this._heat.gradient({ 0.2: 'blue', 0.4: 'cyan', 0.6: 'lime', 0.7: 'yellow', 0.8: 'orange', 0.9: 'red', 1.0: 'purple' });
-                this._heat.max(15); // Adjust this to control purple threshold
+                this._heat.max(15);
 
-                map.on('moveend', this._reset, this);
+                map.on('move', this._reset, this);
+                map.on('resize', this._reset, this);
                 this._reset();
             },
             onRemove: function(map) {
                 map.getPanes().overlayPane.removeChild(this._canvas);
-                map.off('moveend', this._reset, this);
+                map.off('move', this._reset, this);
+                map.off('resize', this._reset, this);
             },
             _reset: function() {
                 const pos = this._map.containerPointToLayerPoint([0, 0]);
@@ -84,7 +86,6 @@
                 this._canvas.width = size.x;
                 this._canvas.height = size.y;
                 
-                // Radius scales with zoom so blobs feel "grounded"
                 const zoom = this._map.getZoom();
                 const radius = Math.max(5, zoom * 1.8);
                 this._heat.radius(radius, radius * 0.8);
@@ -95,7 +96,7 @@
                     data.push([point.x, point.y, p[2]]);
                 });
                 
-                this._heat.data(data).draw(0.05); // minOpacity 0.05
+                this._heat.data(data).draw(0.05);
             },
             setData: function(data) {
                 this._data = data;
@@ -105,33 +106,43 @@
 
         const heatmapLayer = new HeatCanvasLayer().addTo(map);
         let userMarker, userPulse, currentCoords = null;
+        let hasInitiallyCentered = false; // THE FIX: Prevent auto-jumping
         const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
         // GEOLOCATION
         function onLocationFound(e) {
             currentCoords = e.latlng;
+            
             if (!userMarker) {
                 const dot = L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
                 const pulse = L.divIcon({ className: '', html: '<div class="user-pulse"></div>', iconSize: [40, 40], iconAnchor: [20, 20] });
                 userPulse = L.marker(e.latlng, { icon: pulse }).addTo(map);
                 userMarker = L.marker(e.latlng, { icon: dot }).addTo(map);
-                map.setView(e.latlng, 15);
-                fetchShardData();
             } else {
                 userMarker.setLatLng(e.latlng);
                 userPulse.setLatLng(e.latlng);
             }
+
+            // Only snap the camera to the user on the very first GPS update
+            if (!hasInitiallyCentered) {
+                map.setView(e.latlng, 15);
+                hasInitiallyCentered = true;
+                fetchShardData();
+            }
         }
 
         function centerOnUser() {
-            if (currentCoords) map.flyTo(currentCoords, 15);
-            else map.locate({setView: true, maxZoom: 15});
+            if (currentCoords) {
+                map.flyTo(currentCoords, 15);
+            } else {
+                map.locate({setView: true, maxZoom: 15});
+            }
         }
 
         map.on('locationfound', onLocationFound);
         map.locate({ watch: true, enableHighAccuracy: true });
 
-        // FETCH DATA & SHARD LOGIC
+        // FETCH DATA
         async function fetchShardData() {
             const center = map.getCenter();
             const latI = Math.floor(center.lat);
@@ -173,11 +184,10 @@
         map.on('moveend', fetchShardData);
         setInterval(fetchShardData, 5 * 60 * 1000);
 
-        // FUZZING & REPORTING
+        // REPORTING
         async function reportSighting() {
             if (!currentCoords) return alert("Waiting for GPS...");
             
-            // Fuzzing to nearest 25m (approx 0.00025 degrees)
             const fuzz = 0.00025;
             const fLat = Math.round(currentCoords.lat / fuzz) * fuzz;
             const fLon = Math.round(currentCoords.lng / fuzz) * fuzz;
