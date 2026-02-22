@@ -2,58 +2,94 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Oversight | Tactical Map</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; background: #000; }
+        :root { 
+            --apple-blue: #007AFF; 
+            --glass-light: rgba(255, 255, 255, 0.85);
+            --border-light: rgba(0, 0, 0, 0.08);
+        }
         
-        /* THE VISUAL HACK: Prevent tiles from disappearing instantly */
-        .leaflet-tile-container img {
-            /* Keeps the "worse quality" tiles visible while high-res loads */
-            box-shadow: 0 0 1px #000; 
-            filter: brightness(0.9);
-            will-change: transform, opacity;
+        body, html { margin: 0; padding: 0; height: 100%; background: #fdfdfd; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+        
+        /* THE VISUAL FIX: Modern Apple/Google Light Style */
+        .leaflet-tile { 
+            filter: contrast(1.05) saturate(1.1); 
+            transition: opacity 0.4s; 
         }
 
-        /* Smooth fade between "worse" and "better" images */
-        .leaflet-tile-fade-in {
-            animation: tileFade 0.2s ease-in;
+        /* User Marker (Apple Style) */
+        .user-dot { width: 18px; height: 18px; background: var(--apple-blue); border: 3px solid white; border-radius: 50%; box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3); }
+        .user-pulse { 
+            position: absolute; width: 60px; height: 60px; background: rgba(0, 122, 255, 0.15); 
+            border-radius: 50%; transform: translate(-35%, -35%); 
+            animation: pulse 3s infinite ease-out; pointer-events: none; 
         }
-
-        @keyframes tileFade {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .user-dot { width: 14px; height: 14px; background: #3b82f6; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
-        .user-pulse { position: absolute; width: 40px; height: 40px; background: rgba(59, 130, 246, 0.3); border-radius: 50%; transform: translate(-35%, -35%); animation: pulse 2s infinite; pointer-events: none; }
         @keyframes pulse { 0% { transform: scale(0.5); opacity: 0.8; } 100% { transform: scale(2.5); opacity: 0; } }
 
-        .map-ui { pointer-events: none; z-index: 1000; position: absolute; width: 100%; height: 100%; }
+        /* Modern UI */
+        .glass { background: var(--glass-light); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid var(--border-light); }
+        .map-ui { pointer-events: none; z-index: 1000; position: absolute; inset: 0; padding-top: env(safe-area-inset-top); }
         .map-ui > * { pointer-events: auto; }
+
+        /* Filter Pills */
+        .filter-pill { padding: 10px 18px; border-radius: 24px; font-size: 13px; font-weight: 600; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .filter-active { background: #1c1c1e; color: #fff; transform: scale(1.05); }
+        .filter-inactive { background: #fff; color: #8e8e93; border: 1px solid rgba(0,0,0,0.05); }
+        
+        /* Modern Controls Group */
+        .control-group { box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
+        
+        /* Bottom Button Group */
+        .btn-shadow { box-shadow: 0 15px 35px rgba(239, 68, 68, 0.35); }
     </style>
 </head>
-<body class="text-white">
+<body class="antialiased">
 
     <div id="map"></div>
 
-    <div class="map-ui">
-        <div class="absolute top-1/2 -translate-y-1/2 right-4 flex flex-col gap-2">
-            <button onclick="map.zoomIn()" class="w-12 h-12 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center justify-center text-2xl font-bold hover:bg-zinc-800 active:scale-90 transition-all cursor-pointer">+</button>
-            <button onclick="map.zoomOut()" class="w-12 h-12 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center justify-center text-2xl font-bold hover:bg-zinc-800 active:scale-90 transition-all cursor-pointer">−</button>
-            <button onclick="centerOnUser()" class="w-12 h-12 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center justify-center mt-4 hover:bg-zinc-800 active:scale-90 transition-all cursor-pointer">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+    <div class="map-ui flex flex-col items-center">
+        <div class="w-full max-w-md px-5 mt-4 flex flex-col gap-4">
+            <div class="glass rounded-2xl flex items-center px-4 py-1 shadow-lg">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input type="text" id="search-input" placeholder="Find a location..." class="w-full bg-transparent border-none focus:ring-0 px-3 py-3.5 text-[17px] font-medium text-black outline-none placeholder:text-zinc-400">
+            </div>
+
+            <div class="flex gap-2 overflow-x-auto pb-2 no-scrollbar justify-center">
+                <button onclick="setTimeFilter(0.16)" class="filter-pill filter-inactive" id="f-10m">10m</button>
+                <button onclick="setTimeFilter(0.5)" class="filter-pill filter-inactive" id="f-30m">30m</button>
+                <button onclick="setTimeFilter(1)" class="filter-pill filter-active" id="f-1h">1h</button>
+                <button onclick="setTimeFilter(3)" class="filter-pill filter-inactive" id="f-3h">3h</button>
+                <button onclick="setTimeFilter(6)" class="filter-pill filter-inactive" id="f-6h">6h</button>
+            </div>
+            
+            <div id="search-results" class="hidden glass rounded-2xl shadow-2xl max-h-[280px] overflow-y-auto mt-[-8px]"></div>
+        </div>
+
+        <div class="absolute top-1/2 -translate-y-1/2 right-4 flex flex-col gap-4">
+            <div class="flex flex-col glass rounded-2xl control-group overflow-hidden">
+                <button onclick="map.zoomIn()" class="w-13 h-13 flex items-center justify-center border-b border-black/5 active:bg-black/5 transition-colors">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1c1c1e" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <button onclick="map.zoomOut()" class="w-13 h-13 flex items-center justify-center active:bg-black/5 transition-colors">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1c1c1e" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </div>
+            <button onclick="centerOnUser()" class="w-13 h-13 glass rounded-2xl flex items-center justify-center control-group active:scale-90 transition-all">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--apple-blue)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
         </div>
 
-        <div class="absolute bottom-8 left-0 w-full px-6 flex justify-center">
-            <button onclick="reportSighting()" class="w-full max-w-md bg-red-600 text-white py-5 rounded-2xl font-black text-lg uppercase tracking-[0.2em] shadow-2xl shadow-red-900/60 active:scale-95 transition-all cursor-pointer">
-                Report Sighting Here
+        <div class="absolute bottom-10 w-full px-8 flex justify-center">
+            <button onclick="reportSighting()" class="w-full max-w-sm bg-red-500 text-white py-5 rounded-[22px] font-bold text-[18px] btn-shadow active:scale-[0.97] transition-all flex items-center justify-center gap-3">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span>Report ICE</span>
             </button>
         </div>
     </div>
@@ -67,178 +103,161 @@
         const supabaseKey = "sb_publishable_7tfMEc5J9QTJwnxtAcL1Ag_Zwp3GfWd";
         const mySupabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-        // 1. ADVANCED MAP INITIALIZATION
+        // --- MAP INITIALIZATION ---
         const map = L.map('map', { 
             zoomControl: false, 
-            attributionControl: false,
-            // These make the map behave more like a modern app
-            inertia: true,
-            inertiaDeceleration: 3000,
-            fadeAnimation: true,
-            zoomAnimation: true,
-            worldCopyJump: true
+            attributionControl: false, 
+            preferCanvas: true,
+            bounceAtZoomLimits: true
         }).setView([0, 0], 2);
 
-        // 2. THE TILE HACK
-        // edgeBuffer: 3 (Fakes tiles on the side by pre-loading 3 rows out)
-        // updateWhenIdle: false (Loads while moving, not just after stopping)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            updateWhenIdle: false,
-            updateWhenZooming: true,
-            updateInterval: 50,
-            keepBuffer: 8,      // Massively increased to keep "worse" images around
-            maxZoom: 20,
-            minZoom: 3,
-            className: 'leaflet-tile-fade-in'
+        // Modern Vector-like Tile Theme
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { 
+            keepBuffer: 12 
         }).addTo(map);
 
-        // Custom Heatmap Layer
-        const HeatCanvasLayer = L.Layer.extend({
+        // --- HEATMAP ENGINE ---
+        const HeatLayer = L.Layer.extend({
             onAdd: function(map) {
-                this._map = map;
                 this._canvas = L.DomUtil.create('canvas', 'leaflet-heatmap-layer');
+                const ctx = this._canvas.getContext('2d', { willReadFrequently: true });
                 const size = map.getSize();
-                this._canvas.width = size.x;
-                this._canvas.height = size.y;
+                this._canvas.width = size.x; this._canvas.height = size.y;
                 map.getPanes().overlayPane.appendChild(this._canvas);
-                
-                this._heat = simpleheat(this._canvas);
-                this._heat.gradient({ 0.2: 'blue', 0.4: 'cyan', 0.6: 'lime', 0.7: 'yellow', 0.8: 'orange', 0.9: 'red', 1.0: 'purple' });
-                this._heat.max(15);
-
-                map.on('move', this._reset, this);
-                map.on('resize', this._reset, this);
-                this._reset();
+                this._heat = simpleheat(this._canvas).gradient({ 0.4: '#007AFF', 0.6: '#5AC8FA', 0.7: '#4CD964', 0.8: '#FFCC00', 1.0: '#FF3B30' }).max(10);
+                map.on('move', this._reset, this); this._reset();
             },
-            onRemove: function(map) {
-                map.getPanes().overlayPane.removeChild(this._canvas);
-                map.off('move', this._reset, this);
-                map.off('resize', this._reset, this);
-            },
-            _reset: function() {
-                const pos = this._map.containerPointToLayerPoint([0, 0]);
-                L.DomUtil.setPosition(this._canvas, pos);
-                this.redraw();
-            },
+            _reset: function() { const pos = this._map.containerPointToLayerPoint([0, 0]); L.DomUtil.setPosition(this._canvas, pos); this.redraw(); },
             redraw: function() {
                 if (!this._data || !this._map) return;
                 const size = this._map.getSize();
-                this._canvas.width = size.x;
-                this._canvas.height = size.y;
-                
-                const zoom = this._map.getZoom();
-                const radius = Math.max(5, zoom * 1.8);
-                this._heat.radius(radius, radius * 0.8);
-                
-                const data = [];
-                this._data.forEach(p => {
-                    const point = this._map.latLngToContainerPoint([p[0], p[1]]);
-                    data.push([point.x, point.y, p[2]]);
-                });
-                
-                this._heat.data(data).draw(0.05);
+                this._canvas.width = size.x; this._canvas.height = size.y;
+                const r = Math.max(6, this._map.getZoom() * 2.2);
+                this._heat.radius(r, r * 0.9);
+                const data = this._data.map(p => { const pt = this._map.latLngToContainerPoint([p[0], p[1]]); return [pt.x, pt.y, p[2]]; });
+                this._heat.data(data).draw(0.08);
             },
-            setData: function(data) {
-                this._data = data;
-                this.redraw();
-            }
+            setData: function(d) { this._data = d; this.redraw(); }
+        });
+        const heatmapLayer = new HeatLayer().addTo(map);
+
+        let userMarker, userPulse, currentCoords, hasCentered = false;
+        let tacticalLayers = L.layerGroup().addTo(map);
+        let selectedTimeLimit = 1;
+
+        // --- SEARCH ENGINE (Modern Fix) ---
+        const searchInput = document.getElementById('search-input');
+        const searchResults = document.getElementById('search-results');
+        
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            if (query.length < 3) { searchResults.classList.add('hidden'); return; }
+            const s = document.createElement('script');
+            s.src = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&json_callback=handleSearch`;
+            document.body.appendChild(s);
+            document.body.removeChild(s);
         });
 
-        const heatmapLayer = new HeatCanvasLayer().addTo(map);
-        let userMarker, userPulse, currentCoords = null;
-        let hasInitiallyCentered = false;
-        const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+        window.handleSearch = function(data) {
+            searchResults.innerHTML = '';
+            if (data && data.length > 0) {
+                data.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'p-4 border-b border-black/5 hover:bg-black/5 cursor-pointer text-[15px] font-semibold text-black';
+                    div.innerText = p.display_name;
+                    div.onclick = () => {
+                        map.flyTo([p.lat, p.lon], 15, { duration: 1.5 });
+                        searchResults.classList.add('hidden');
+                        searchInput.value = '';
+                    };
+                    searchResults.appendChild(div);
+                });
+                searchResults.classList.remove('hidden');
+            }
+        };
 
-        // GEOLOCATION
-        function onLocationFound(e) {
+        // --- GPS LOGIC ---
+        map.on('locationfound', (e) => {
             currentCoords = e.latlng;
             if (!userMarker) {
-                const dot = L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
-                const pulse = L.divIcon({ className: '', html: '<div class="user-pulse"></div>', iconSize: [40, 40], iconAnchor: [20, 20] });
-                userPulse = L.marker(e.latlng, { icon: pulse }).addTo(map);
-                userMarker = L.marker(e.latlng, { icon: dot }).addTo(map);
-            } else {
-                userMarker.setLatLng(e.latlng);
-                userPulse.setLatLng(e.latlng);
-            }
-
-            if (!hasInitiallyCentered) {
-                map.setView(e.latlng, 15);
-                hasInitiallyCentered = true;
-                fetchShardData();
-            }
-        }
-
-        function centerOnUser() {
-            if (currentCoords) map.flyTo(currentCoords, 15);
-            else map.locate({setView: true, maxZoom: 15});
-        }
-
-        map.on('locationfound', onLocationFound);
+                userPulse = L.marker(e.latlng, { icon: L.divIcon({ className: '', html: '<div class="user-pulse"></div>', iconSize: [60, 60], iconAnchor: [30, 30] }) }).addTo(map);
+                userMarker = L.marker(e.latlng, { icon: L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(map);
+            } else { userMarker.setLatLng(e.latlng); userPulse.setLatLng(e.latlng); }
+            if (!hasCentered) { map.setView(e.latlng, 15); hasCentered = true; fetchShardData(); }
+        });
         map.locate({ watch: true, enableHighAccuracy: true });
 
-        // FETCH DATA
+        function centerOnUser() { if (currentCoords) map.flyTo(currentCoords, 15, { duration: 1 }); }
+
+        // --- TACTICAL PATH ANALYSIS ---
+        function drawChains(points) {
+            tacticalLayers.clearLayers();
+            if (points.length < 3) return;
+            const sorted = points.sort((a,b) => a.ts - b.ts);
+            
+            let chains = [];
+            let cur = [sorted[0]];
+            for (let i = 1; i < sorted.length; i++) {
+                const d = map.distance([sorted[i].lat, sorted[i].lon], [sorted[i-1].lat, sorted[i-1].lon]);
+                if (d < 1500) cur.push(sorted[i]);
+                else { if (cur.length >= 3) chains.push(cur); cur = [sorted[i]]; }
+            }
+            if (cur.length >= 3) chains.push(cur);
+
+            chains.forEach(c => {
+                const n = c.length;
+                const startTs = c[0].ts;
+                const last = c[n-1];
+                L.polyline(c.map(p => [p.lat, p.lon]), { color: '#8e8e93', weight: 2.5, opacity: 0.5 }).addTo(tacticalLayers);
+
+                let sX=0, sYLa=0, sYLo=0, sXX=0, sXYLa=0, sXYLo=0;
+                c.forEach(p => {
+                    const x = (p.ts - startTs) / 1000;
+                    sX += x; sYLa += p.lat; sYLo += p.lon; sXX += x*x; sXYLa += x*p.lat; sXYLo += x*p.lon;
+                });
+                const det = n * sXX - sX * sX;
+                if (det === 0) return;
+                const pLat = last.lat + ((n * sXYLa - sX * sYLa) / det * 900);
+                const pLon = last.lon + ((n * sXYLo - sX * sYLo) / det * 900);
+
+                L.polyline([[last.lat, last.lon], [pLat, pLon]], { color: '#ff3b30', weight: 4, dashArray: '8, 12' }).addTo(tacticalLayers);
+                L.circleMarker([pLat, pLon], { radius: 5, color: '#ff3b30', fillColor: '#ff3b30', fillOpacity: 1 }).addTo(tacticalLayers);
+            });
+        }
+
         async function fetchShardData() {
             const center = map.getCenter();
-            const latI = Math.floor(center.lat);
-            const lonI = Math.floor(center.lng);
-            const shards = [[latI, lonI], [latI+1, lonI], [latI-1, lonI], [latI, lonI+1], [latI, lonI-1]];
-            
             const now = Date.now();
-            const sixHoursAgoIso = new Date(now - SIX_HOURS_MS).toISOString();
-            let allPoints = [];
-
+            const limit = selectedTimeLimit * 3600000;
+            const shards = [[Math.floor(center.lat), Math.floor(center.lng)], [Math.floor(center.lat)+1, Math.floor(center.lng)], [Math.floor(center.lat)-1, Math.floor(center.lng)], [Math.floor(center.lat), Math.floor(center.lng)+1], [Math.floor(center.lat), Math.floor(center.lng)-1]];
+            
+            let pts = [], raw = [];
             for (const [la, lo] of shards) {
-                const key = `s_${la}_${lo}`;
-                let shardData = [];
-
-                if (sessionStorage.getItem(key)) {
-                    shardData = JSON.parse(sessionStorage.getItem(key));
-                } else {
-                    const { data } = await mySupabase.from('reports')
-                        .select('lat_decimal, lon_decimal, created_at')
-                        .eq('lat_int', la).eq('lon_int', lo)
-                        .gt('created_at', sixHoursAgoIso);
-                    if (data) {
-                        shardData = data;
-                        sessionStorage.setItem(key, JSON.stringify(shardData));
-                    }
-                }
-
-                shardData.forEach(d => {
-                    const ageInMs = now - new Date(d.created_at).getTime();
-                    if (ageInMs < SIX_HOURS_MS) {
-                        let intensity = 1 - (ageInMs / SIX_HOURS_MS);
-                        allPoints.push([d.lat_decimal, d.lon_decimal, intensity]);
-                    }
+                const { data } = await mySupabase.from('reports').select('lat_decimal, lon_decimal, created_at').eq('lat_int', la).eq('lon_int', lo).gt('created_at', new Date(now - limit).toISOString());
+                if (data) data.forEach(d => {
+                    const age = now - new Date(d.created_at).getTime();
+                    pts.push([d.lat_decimal, d.lon_decimal, 1 - (age / limit)]);
+                    raw.push({ lat: d.lat_decimal, lon: d.lon_decimal, ts: new Date(d.created_at).getTime() });
                 });
             }
-            heatmapLayer.setData(allPoints);
+            heatmapLayer.setData(pts);
+            drawChains(raw);
+        }
+
+        function setTimeFilter(h) {
+            selectedTimeLimit = h;
+            ['10m','30m','1h','3h','6h'].forEach(b => document.getElementById(`f-${b}`).className = 'filter-pill filter-inactive');
+            const lbl = h < 1 ? (h === 0.16 ? '10m' : '30m') : h + 'h';
+            document.getElementById(`f-${lbl}`).className = 'filter-pill filter-active';
+            fetchShardData();
         }
 
         map.on('moveend', fetchShardData);
-        setInterval(fetchShardData, 5 * 60 * 1000);
-
-        // REPORTING
         async function reportSighting() {
-            if (!currentCoords) return alert("Waiting for GPS...");
-            const fuzz = 0.00025;
-            const fLat = Math.round(currentCoords.lat / fuzz) * fuzz;
-            const fLon = Math.round(currentCoords.lng / fuzz) * fuzz;
-
-            const { error } = await mySupabase.from('reports').insert([{
-                lat_int: Math.floor(fLat),
-                lon_int: Math.floor(fLon),
-                lat_decimal: fLat,
-                lon_decimal: fLon
-            }]);
-
-            if (error) alert("Database Error.");
-            else {
-                alert("Location Reported.");
-                sessionStorage.removeItem(`s_${Math.floor(fLat)}_${Math.floor(fLon)}`);
-                fetchShardData();
-            }
+            if (!currentCoords) return;
+            const f = 0.00025, la = Math.round(currentCoords.lat/f)*f, lo = Math.round(currentCoords.lng/f)*f;
+            await mySupabase.from('reports').insert([{ lat_int: Math.floor(la), lon_int: Math.floor(lo), lat_decimal: la, lon_decimal: lo }]);
+            fetchShardData();
         }
     </script>
 </body>
