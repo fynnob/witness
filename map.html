@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Map | Oversight 2026</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; background: #09090b; overflow: hidden; font-family: sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+        
+        .user-dot { width: 14px; height: 14px; background: #3b82f6; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+        .user-pulse { position: absolute; width: 40px; height: 40px; background: rgba(59, 130, 246, 0.3); border-radius: 50%; transform: translate(-35%, -35%); animation: pulse 2s infinite; pointer-events: none; }
+        @keyframes pulse { 0% { transform: scale(0.5); opacity: 0.8; } 100% { transform: scale(2.5); opacity: 0; } }
+
+        .map-ui { pointer-events: none; z-index: 1000; position: absolute; width: 100%; height: 100%; }
+        .map-ui > * { pointer-events: auto; }
+    </style>
+</head>
+<body class="text-white">
+
+    <div id="map"></div>
+
+    <div class="map-ui">
+        <div class="absolute top-1/2 -translate-y-1/2 right-4 flex flex-col gap-2">
+            <button onclick="map.zoomIn()" class="w-12 h-12 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center justify-center text-2xl font-bold hover:bg-zinc-800 active:scale-90 transition-all cursor-pointer">+</button>
+            <button onclick="map.zoomOut()" class="w-12 h-12 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center justify-center text-2xl font-bold hover:bg-zinc-800 active:scale-90 transition-all cursor-pointer">−</button>
+            <button onclick="centerOnUser()" class="w-12 h-12 bg-zinc-900/90 border border-zinc-800 rounded-xl flex items-center justify-center mt-4 hover:bg-zinc-800 active:scale-90 transition-all cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+        </div>
+
+        <div class="absolute bottom-8 left-0 w-full px-6 flex justify-center">
+            <button onclick="reportSighting()" class="w-full max-w-md bg-red-600 text-white py-5 rounded-2xl font-black text-lg uppercase tracking-[0.2em] shadow-2xl shadow-red-900/60 active:scale-95 transition-all cursor-pointer">
+                Report Sighting Here
+            </button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/simpleheat@0.4.0/simpleheat.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+    <script>
+        const supabaseUrl = "https://qburnwsfauymwwwpmjoo.supabase.co";
+        const supabaseKey = "sb_publishable_7tfMEc5J9QTJwnxtAcL1Ag_Zwp3GfWd";
+        const mySupabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0, 0], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        // Custom Heatmap Layer using Canvas
+        const HeatCanvasLayer = L.CanvasLayer = L.Layer.extend({
+            onAdd: function(map) {
+                this._map = map;
+                this._canvas = L.DomUtil.create('canvas', 'leaflet-heatmap-layer');
+                const size = map.getSize();
+                this._canvas.width = size.x;
+                this._canvas.height = size.y;
+                map.getPanes().overlayPane.appendChild(this._canvas);
+                
+                this._heat = simpleheat(this._canvas);
+                this._heat.gradient({ 0.2: 'blue', 0.4: 'cyan', 0.6: 'lime', 0.7: 'yellow', 0.8: 'orange', 0.9: 'red', 1.0: 'purple' });
+                this._heat.max(15); // Adjust this to control purple threshold
+
+                map.on('moveend', this._reset, this);
+                this._reset();
+            },
+            onRemove: function(map) {
+                map.getPanes().overlayPane.removeChild(this._canvas);
+                map.off('moveend', this._reset, this);
+            },
+            _reset: function() {
+                const pos = this._map.containerPointToLayerPoint([0, 0]);
+                L.DomUtil.setPosition(this._canvas, pos);
+                this.redraw();
+            },
+            redraw: function() {
+                if (!this._data || !this._map) return;
+                const size = this._map.getSize();
+                this._canvas.width = size.x;
+                this._canvas.height = size.y;
+                
+                // Radius scales with zoom so blobs feel "grounded"
+                const zoom = this._map.getZoom();
+                const radius = Math.max(5, zoom * 1.8);
+                this._heat.radius(radius, radius * 0.8);
+                
+                const data = [];
+                this._data.forEach(p => {
+                    const point = this._map.latLngToContainerPoint([p[0], p[1]]);
+                    data.push([point.x, point.y, p[2]]);
+                });
+                
+                this._heat.data(data).draw(0.05); // minOpacity 0.05
+            },
+            setData: function(data) {
+                this._data = data;
+                this.redraw();
+            }
+        });
+
+        const heatmapLayer = new HeatCanvasLayer().addTo(map);
+        let userMarker, userPulse, currentCoords = null;
+        const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+
+        // GEOLOCATION
+        function onLocationFound(e) {
+            currentCoords = e.latlng;
+            if (!userMarker) {
+                const dot = L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
+                const pulse = L.divIcon({ className: '', html: '<div class="user-pulse"></div>', iconSize: [40, 40], iconAnchor: [20, 20] });
+                userPulse = L.marker(e.latlng, { icon: pulse }).addTo(map);
+                userMarker = L.marker(e.latlng, { icon: dot }).addTo(map);
+                map.setView(e.latlng, 15);
+                fetchShardData();
+            } else {
+                userMarker.setLatLng(e.latlng);
+                userPulse.setLatLng(e.latlng);
+            }
+        }
+
+        function centerOnUser() {
+            if (currentCoords) map.flyTo(currentCoords, 15);
+            else map.locate({setView: true, maxZoom: 15});
+        }
+
+        map.on('locationfound', onLocationFound);
+        map.locate({ watch: true, enableHighAccuracy: true });
+
+        // FETCH DATA & SHARD LOGIC
+        async function fetchShardData() {
+            const center = map.getCenter();
+            const latI = Math.floor(center.lat);
+            const lonI = Math.floor(center.lng);
+            const shards = [[latI, lonI], [latI+1, lonI], [latI-1, lonI], [latI, lonI+1], [latI, lonI-1]];
+            
+            const now = Date.now();
+            const sixHoursAgoIso = new Date(now - SIX_HOURS_MS).toISOString();
+            let allPoints = [];
+
+            for (const [la, lo] of shards) {
+                const key = `s_${la}_${lo}`;
+                let shardData = [];
+
+                if (sessionStorage.getItem(key)) {
+                    shardData = JSON.parse(sessionStorage.getItem(key));
+                } else {
+                    const { data } = await mySupabase.from('reports')
+                        .select('lat_decimal, lon_decimal, created_at')
+                        .eq('lat_int', la).eq('lon_int', lo)
+                        .gt('created_at', sixHoursAgoIso);
+                    if (data) {
+                        shardData = data;
+                        sessionStorage.setItem(key, JSON.stringify(shardData));
+                    }
+                }
+
+                shardData.forEach(d => {
+                    const ageInMs = now - new Date(d.created_at).getTime();
+                    if (ageInMs < SIX_HOURS_MS) {
+                        let intensity = 1 - (ageInMs / SIX_HOURS_MS);
+                        allPoints.push([d.lat_decimal, d.lon_decimal, intensity]);
+                    }
+                });
+            }
+            heatmapLayer.setData(allPoints);
+        }
+
+        map.on('moveend', fetchShardData);
+        setInterval(fetchShardData, 5 * 60 * 1000);
+
+        // FUZZING & REPORTING
+        async function reportSighting() {
+            if (!currentCoords) return alert("Waiting for GPS...");
+            
+            // Fuzzing to nearest 25m (approx 0.00025 degrees)
+            const fuzz = 0.00025;
+            const fLat = Math.round(currentCoords.lat / fuzz) * fuzz;
+            const fLon = Math.round(currentCoords.lng / fuzz) * fuzz;
+
+            const { error } = await mySupabase.from('reports').insert([{
+                lat_int: Math.floor(fLat),
+                lon_int: Math.floor(fLon),
+                lat_decimal: fLat,
+                lon_decimal: fLon
+            }]);
+
+            if (error) alert("Database Error.");
+            else {
+                alert("Location Reported.");
+                sessionStorage.removeItem(`s_${Math.floor(fLat)}_${Math.floor(fLon)}`);
+                fetchShardData();
+            }
+        }
+    </script>
+</body>
+</html>
