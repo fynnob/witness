@@ -9,9 +9,27 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #09090b; overflow: hidden; font-family: sans-serif; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; background: #000; }
         
+        /* THE VISUAL HACK: Prevent tiles from disappearing instantly */
+        .leaflet-tile-container img {
+            /* Keeps the "worse quality" tiles visible while high-res loads */
+            box-shadow: 0 0 1px #000; 
+            filter: brightness(0.9);
+            will-change: transform, opacity;
+        }
+
+        /* Smooth fade between "worse" and "better" images */
+        .leaflet-tile-fade-in {
+            animation: tileFade 0.2s ease-in;
+        }
+
+        @keyframes tileFade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
         .user-dot { width: 14px; height: 14px; background: #3b82f6; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
         .user-pulse { position: absolute; width: 40px; height: 40px; background: rgba(59, 130, 246, 0.3); border-radius: 50%; transform: translate(-35%, -35%); animation: pulse 2s infinite; pointer-events: none; }
         @keyframes pulse { 0% { transform: scale(0.5); opacity: 0.8; } 100% { transform: scale(2.5); opacity: 0; } }
@@ -49,8 +67,30 @@
         const supabaseKey = "sb_publishable_7tfMEc5J9QTJwnxtAcL1Ag_Zwp3GfWd";
         const mySupabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0, 0], 2);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        // 1. ADVANCED MAP INITIALIZATION
+        const map = L.map('map', { 
+            zoomControl: false, 
+            attributionControl: false,
+            // These make the map behave more like a modern app
+            inertia: true,
+            inertiaDeceleration: 3000,
+            fadeAnimation: true,
+            zoomAnimation: true,
+            worldCopyJump: true
+        }).setView([0, 0], 2);
+
+        // 2. THE TILE HACK
+        // edgeBuffer: 3 (Fakes tiles on the side by pre-loading 3 rows out)
+        // updateWhenIdle: false (Loads while moving, not just after stopping)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            updateWhenIdle: false,
+            updateWhenZooming: true,
+            updateInterval: 50,
+            keepBuffer: 8,      // Massively increased to keep "worse" images around
+            maxZoom: 20,
+            minZoom: 3,
+            className: 'leaflet-tile-fade-in'
+        }).addTo(map);
 
         // Custom Heatmap Layer
         const HeatCanvasLayer = L.Layer.extend({
@@ -106,13 +146,12 @@
 
         const heatmapLayer = new HeatCanvasLayer().addTo(map);
         let userMarker, userPulse, currentCoords = null;
-        let hasInitiallyCentered = false; // THE FIX: Prevent auto-jumping
+        let hasInitiallyCentered = false;
         const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
         // GEOLOCATION
         function onLocationFound(e) {
             currentCoords = e.latlng;
-            
             if (!userMarker) {
                 const dot = L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
                 const pulse = L.divIcon({ className: '', html: '<div class="user-pulse"></div>', iconSize: [40, 40], iconAnchor: [20, 20] });
@@ -123,7 +162,6 @@
                 userPulse.setLatLng(e.latlng);
             }
 
-            // Only snap the camera to the user on the very first GPS update
             if (!hasInitiallyCentered) {
                 map.setView(e.latlng, 15);
                 hasInitiallyCentered = true;
@@ -132,11 +170,8 @@
         }
 
         function centerOnUser() {
-            if (currentCoords) {
-                map.flyTo(currentCoords, 15);
-            } else {
-                map.locate({setView: true, maxZoom: 15});
-            }
+            if (currentCoords) map.flyTo(currentCoords, 15);
+            else map.locate({setView: true, maxZoom: 15});
         }
 
         map.on('locationfound', onLocationFound);
@@ -187,7 +222,6 @@
         // REPORTING
         async function reportSighting() {
             if (!currentCoords) return alert("Waiting for GPS...");
-            
             const fuzz = 0.00025;
             const fLat = Math.round(currentCoords.lat / fuzz) * fuzz;
             const fLon = Math.round(currentCoords.lng / fuzz) * fuzz;
