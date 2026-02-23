@@ -2,94 +2,155 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WITNESS | Oversight 2026</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Witness | Community Safety</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Witness">
+    <meta name="theme-color" content="#FF3B30">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2584/2584661.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --apple-red: #FF3B30; --bg: #fbfbfd; --text: #1c1c1e; --card: rgba(255, 255, 255, 0.75); --border: rgba(0,0,0,0.06); }
+        .dark { --bg: #000000; --text: #ffffff; --card: rgba(28, 28, 30, 0.8); --border: rgba(255,255,255,0.12); }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; transition: background 0.5s ease, color 0.5s ease; overflow-x: hidden; }
+        .hero-title { font-size: clamp(3.4rem, 11vw, 7rem); line-height: 0.85; letter-spacing: -0.05em; font-weight: 900; }
+        .page-container { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .nav-card { background: var(--card); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid var(--border); color: var(--text); transition: all 0.4s cubic-bezier(0.15, 0, 0.15, 1); position: relative; }
+        .nav-card:not(.disabled):hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .disabled { opacity: 0.6; cursor: not-allowed; }
+        .badge { position: absolute; top: 1.5rem; right: 1.5rem; background: var(--apple-red); color: white; font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .switch { position: relative; display: inline-block; width: 46px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #d1d1d6; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--apple-red); }
+        input:checked + .slider:before { transform: translateX(20px); }
+        .reveal { opacity: 0; animation: slideUp 1s cubic-bezier(0.15, 0, 0.15, 1) forwards; }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; filter: blur(8px); } to { transform: translateY(0); opacity: 1; filter: blur(0); } }
+        #more-victims { display: none; }
+        #more-victims.show { display: block; animation: slideUp 0.5s ease; }
+        .victim-entry { padding: 1.5rem 0; border-bottom: 1px solid var(--border); }
+        .victim-entry:last-child { border: none; }
+    </style>
 </head>
-<body class="bg-black text-zinc-50 selection:bg-red-500/40">
+<body class="p-6 md:p-12">
 
-    <div class="bg-zinc-100 text-black text-[10px] py-2 px-4 text-center uppercase tracking-[0.2em] font-black">
-        In Partnership with [US NGO NAME] • 1st Amendment Protected
-    </div>
-
-    <main class="max-w-4xl mx-auto px-6 py-12 md:py-24">
-        
-        <header class="space-y-4">
-            <h1 class="text-6xl md:text-8xl font-black tracking-tighter leading-none">
-                THE WORLD IS <br><span class="text-red-500">WATCHING.</span>
-            </h1>
-            <p class="text-xl md:text-2xl text-zinc-300 font-medium max-w-xl">
-                8 deaths in the first 45 days of 2026. Oversight is a necessity, not a crime.
-            </p>
+    <div class="page-container">
+        <header class="w-full flex justify-between items-center mb-20 reveal" style="animation-delay: 0.1s;">
+            <div class="flex items-center gap-2">
+                <div class="w-2.5 h-2.5 bg-red-600 rounded-full animate-pulse"></div>
+                <span class="font-black tracking-tighter text-xl uppercase">Witness</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="mode-toggle" onclick="toggleMode()">
+                <span class="slider"></span>
+            </label>
         </header>
 
-        <section class="mt-16 grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            <div class="bg-zinc-900 border-2 border-zinc-800 p-8 rounded-3xl flex flex-col justify-between">
-                <div>
-                    <h2 class="text-4xl font-black mb-4 uppercase text-white">Record</h2>
-                    <p class="text-zinc-300 text-lg font-medium leading-snug mb-8">
-                        Stream video instantly. Data is off-loaded before your device is seized.
-                    </p>
-                </div>
-                
-                <div class="space-y-4">
-                    <a href="/record.html" class="block w-full bg-red-600 text-white text-center py-4 rounded-xl font-black hover:bg-red-700 transition-all uppercase tracking-widest">
-                        Open Recorder
-                    </a>
-                    <div class="text-center space-y-2 py-2">
-                        <p class="text-xs text-red-400 font-black uppercase tracking-wider">
-                            ⚠️ NGO Login Required to Archive
-                        </p>
-                        <p class="text-sm text-zinc-100 font-bold border-t border-zinc-800 pt-2">
-                            Share a "Witness Link" for live family viewing (No login needed).
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-zinc-900 border-2 border-zinc-800 p-8 rounded-3xl flex flex-col justify-between">
-                <div>
-                    <h2 class="text-4xl font-black mb-4 uppercase text-white">Map</h2>
-                    <p class="text-zinc-300 text-lg font-medium leading-snug mb-8">
-                        See live community reports of federal activity in your neighborhood.
-                    </p>
-                </div>
-                
-                <div class="space-y-4">
-                    <a href="/map.html" class="block w-full bg-zinc-700 text-white text-center py-4 rounded-xl font-black hover:bg-zinc-600 transition-all uppercase tracking-widest">
-                        View Live Map
-                    </a>
-                    <p class="text-xs text-green-400 text-center font-black uppercase tracking-wider">
-                        ✅ No Login Required to Report
-                    </p>
-                </div>
-            </div>
+        <section class="mb-14 reveal" style="animation-delay: 0.2s;">
+            <h1 class="hero-title uppercase">WE NEED TO<br><span class="text-red-600">STOP ICE</span></h1>
+            <p class="text-zinc-500 font-semibold text-lg mt-8 max-w-sm mx-auto leading-tight">
+                Protecting those who contribute to our communities.<br>
+                <span class="opacity-80">The world is watching.</span>
+            </p>
         </section>
 
-        <section class="mt-24">
-            <h3 class="text-xs font-black uppercase tracking-[0.4em] text-zinc-500 mb-8">Documents in Action</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="aspect-[4/5] bg-zinc-800 rounded-2xl flex flex-col justify-end p-6 border border-zinc-700">
-                    <p class="text-zinc-400 text-xs italic mb-4">[Image: Secure Streaming Interface]</p>
-                    <p class="text-sm font-black uppercase text-red-500">Secure Backup</p>
+        <nav class="w-full flex flex-col gap-3 mb-28 reveal" style="animation-delay: 0.4s;">
+            <a id="dynamic-link" href="app.html" class="nav-card bg-black !text-white p-7 rounded-[2.5rem] flex justify-between items-center group shadow-2xl">
+                <div class="text-left">
+                    <p id="dynamic-text" class="font-bold text-2xl">Install Witness</p>
+                    <p id="dynamic-sub" class="text-white/40 text-[10px] uppercase tracking-[0.2em] font-black">Censorship-Proof App</p>
                 </div>
-                <div class="aspect-[4/5] bg-zinc-800 rounded-2xl flex flex-col justify-end p-6 border border-zinc-700">
-                    <p class="text-zinc-400 text-xs italic mb-4">[Image: Regional Activity Map]</p>
-                    <p class="text-sm font-black uppercase text-blue-400">Live Oversight</p>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="group-hover:translate-x-1 transition-transform"><path d="M5 12h14m-7-7l7 7-7 7"/></svg>
+            </a>
+
+            <a href="map.html" class="nav-card p-7 rounded-[2.5rem] flex justify-between items-center group">
+                <div class="text-left">
+                    <p class="font-bold text-2xl">Live Map</p>
+                    <p class="text-zinc-500 text-[10px] uppercase tracking-[0.2em] font-black">Community Grid</p>
                 </div>
-                <div class="aspect-[4/5] bg-zinc-800 rounded-2xl flex flex-col justify-end p-6 border border-zinc-700">
-                    <p class="text-zinc-400 text-xs italic mb-4">[Image: Multilingual Rights Script]</p>
-                    <p class="text-sm font-black uppercase text-amber-400">Verified Scripts</p>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="group-hover:translate-x-1 transition-transform"><path d="M5 12h14m-7-7l7 7-7 7"/></svg>
+            </a>
+
+            <div class="nav-card disabled p-7 rounded-[2.5rem] flex justify-between items-center group">
+                <span class="badge">Coming Soon</span>
+                <div class="text-left">
+                    <p class="font-bold text-2xl">ICE Cam</p>
+                    <p class="text-zinc-500 text-[10px] uppercase tracking-[0.2em] font-black">Broadcast Evidence</p>
+                </div>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="opacity-30"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+
+            <a href="help.html" class="nav-card p-7 rounded-[2.5rem] flex justify-between items-center group">
+                <div class="text-left">
+                    <p class="font-bold text-2xl">What to do</p>
+                    <p class="text-zinc-500 text-[10px] uppercase tracking-[0.2em] font-black">Legal Resources</p>
+                </div>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="group-hover:translate-x-1 transition-transform"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </a>
+        </nav>
+
+        <footer class="w-full reveal mb-20" style="animation-delay: 0.6s;">
+            <div class="text-xs font-black text-zinc-400 uppercase tracking-[0.3em] mb-12">8 Reported Deaths in 2026</div>
+            <div class="space-y-2">
+                <div class="victim-entry"><p class="font-black text-2xl">Alex Pretti</p><p class="text-zinc-500 font-medium text-sm mt-1">37 Years Old • ICU Nurse • Minneapolis, MN</p></div>
+                <div class="victim-entry"><p class="font-black text-2xl">Renee Nicole Good</p><p class="text-zinc-500 font-medium text-sm mt-1">37 Years Old • Poet & Mother • Minneapolis, MN</p></div>
+                <div id="more-victims" class="space-y-2">
+                    <div class="victim-entry"><p class="font-black text-2xl">Luis Gustavo Núñez Cáceres</p><p class="text-zinc-500 font-medium text-sm mt-1">42 Years Old • Brother & Son • Conroe, TX</p></div>
+                    <div class="victim-entry"><p class="font-black text-2xl">Geraldo Lunas Campos</p><p class="text-zinc-500 font-medium text-sm mt-1">55 Years Old • Father of Four • El Paso, TX</p></div>
+                    <div class="victim-entry"><p class="font-black text-2xl">Víctor Manuel Díaz</p><p class="text-zinc-500 font-medium text-sm mt-1">36 Years Old • Brother & Son • El Paso, TX</p></div>
+                    <div class="victim-entry"><p class="font-black text-2xl">Parady La</p><p class="text-zinc-500 font-medium text-sm mt-1">46 Years Old • Beloved Father • Philadelphia, PA</p></div>
+                    <div class="victim-entry"><p class="font-black text-2xl">Luis Beltrán Yáñez–Cruz</p><p class="text-zinc-500 font-medium text-sm mt-1">68 Years Old • Father of Three • Indio, CA</p></div>
+                    <div class="victim-entry"><p class="font-black text-2xl">Heber Sánchez Domínguez</p><p class="text-zinc-500 font-medium text-sm mt-1">34 Years Old • Son • Lovejoy, GA</p></div>
                 </div>
             </div>
-        </section>
+            <button onclick="toggleMore()" id="more-btn" class="mt-14 text-zinc-400 font-black text-[10px] uppercase tracking-widest hover:text-red-600 transition-colors">+ Reveal full memorial</button>
+        </footer>
+    </div>
 
-    </main>
+    <script>
+        // Theme Logic
+        function toggleMode() {
+            document.body.classList.toggle('dark');
+            localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+        }
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark');
+            document.getElementById('mode-toggle').checked = true;
+        }
 
-    <footer class="mt-20 border-t border-zinc-900 py-16 text-center">
-        <p class="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em]">Witness Project 2026 • Berlin-US Oversight</p>
-    </footer>
+        // PWA Detection & UI Swap
+        window.addEventListener('DOMContentLoaded', () => {
+            const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            if (isPWA) {
+                document.getElementById('dynamic-link').href = "settings.html";
+                document.getElementById('dynamic-text').innerText = "Settings";
+                document.getElementById('dynamic-sub').innerText = "Watch Zones & Privacy";
+            }
+        });
 
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
+
+        function toggleMore() {
+            const list = document.getElementById('more-victims');
+            const btn = document.getElementById('more-btn');
+            if(list.classList.contains('show')) {
+                list.classList.remove('show');
+                btn.innerText = "+ Reveal full memorial";
+            } else {
+                list.classList.add('show');
+                btn.innerText = "- Hide memorial";
+            }
+        }
+    </script>
 </body>
 </html>

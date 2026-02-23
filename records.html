@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Witness | Records</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --apple-red: #FF3B30; --bg: #fbfbfd; --text: #1c1c1e; --card: rgba(255, 255, 255, 0.75); --border: rgba(0,0,0,0.06); }
+        .dark { --bg: #000000; --text: #ffffff; --card: rgba(28, 28, 30, 0.8); --border: rgba(255,255,255,0.12); }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; }
+        .page-container { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
+        .glass-card { background: var(--card); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid var(--border); border-radius: 2rem; padding: 2rem; width: 100%; margin-bottom: 1rem; }
+    </style>
+</head>
+<body class="p-6 md:p-12">
+    <div class="page-container">
+        <header class="w-full flex justify-between items-center mb-12">
+            <a href="help.html" class="font-black text-zinc-400">← Back</a>
+            <span class="font-black uppercase tracking-tighter">Your Records</span>
+            <button onclick="clearAll()" class="text-[10px] font-black text-red-600 uppercase">Wipe All</button>
+        </header>
+
+        <div id="logs-container" class="w-full">
+            </div>
+    </div>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+
+        function renderLogs() {
+            const container = document.getElementById('logs-container');
+            const logs = JSON.parse(localStorage.getItem('witness_logs') || '[]');
+            
+            if(logs.length === 0) {
+                container.innerHTML = `<p class="text-center text-zinc-500 mt-20">No records saved on this device.</p>`;
+                return;
+            }
+
+            container.innerHTML = logs.map(log => `
+                <div class="glass-card">
+                    <p class="text-[10px] font-black opacity-30 mb-2 uppercase">${log.date}</p>
+                    <p class="font-bold text-lg">${log.name || 'Unknown Agent'}</p>
+                    <p class="text-red-600 font-mono text-xs mb-4">Badge: ${log.badge || 'N/A'}</p>
+                    <p class="text-sm text-zinc-500 leading-relaxed italic">"${log.notes || 'No notes added.'}"</p>
+                    <button onclick="deleteLog(${log.id})" class="mt-4 text-[10px] font-black uppercase tracking-widest opacity-20 hover:opacity-100 transition-opacity">Delete Entry</button>
+                </div>
+            `).join('');
+        }
+
+        function deleteLog(id) {
+            let logs = JSON.parse(localStorage.getItem('witness_logs') || '[]');
+            logs = logs.filter(l => l.id !== id);
+            localStorage.setItem('witness_logs', JSON.stringify(logs));
+            renderLogs();
+        }
+
+        function clearAll() {
+            if(confirm("This will permanently delete all logs on this device. Continue?")) {
+                localStorage.removeItem('witness_logs');
+                renderLogs();
+            }
+        }
+
+        renderLogs();
+    </script>
+</body>
+</html>

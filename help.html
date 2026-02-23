@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Witness | Protocol</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --apple-red: #FF3B30; --bg: #fbfbfd; --text: #1c1c1e; --card: rgba(255, 255, 255, 0.8); --border: rgba(0,0,0,0.06); }
+        .dark { --bg: #000000; --text: #ffffff; --card: rgba(28, 28, 30, 0.85); --border: rgba(255,255,255,0.12); }
+        
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; transition: background 0.4s ease; overflow-x: hidden; }
+        .page-container { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
+        .glass-card { background: var(--card); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--border); border-radius: 2.5rem; padding: 2.2rem; width: 100%; text-align: left; }
+        
+        .triage-btn { padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 11px; background: var(--card); border: 1px solid var(--border); transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.08em; }
+        .triage-btn.active { background: var(--apple-red); color: white; border-color: var(--apple-red); box-shadow: 0 8px 20px rgba(255, 59, 48, 0.3); }
+        
+        .universal-rule { border-left: 4px solid var(--apple-red); padding-left: 1.2rem; margin-top: 1.5rem; }
+        .warrant-box { background: #fff; border: 2px dashed #d1d1d6; border-radius: 1rem; padding: 1rem; margin: 1rem 0; color: #000; }
+        
+        .reveal { opacity: 0; animation: slideUp 0.5s cubic-bezier(0.15, 0, 0.15, 1) forwards; }
+        @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #d1d1d6; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--apple-red); }
+        input:checked + .slider:before { transform: translateX(18px); }
+    </style>
+</head>
+<body class="p-5 md:p-12">
+
+    <div class="page-container">
+        <header class="w-full flex justify-between items-center mb-10 reveal">
+            <a href="index.html" class="font-black tracking-tighter text-lg uppercase">Witness</a>
+            <label class="switch">
+                <input type="checkbox" id="mode-toggle" onclick="toggleMode()">
+                <span class="slider"></span>
+            </label>
+        </header>
+
+        <div class="flex flex-wrap justify-center gap-2 mb-8 w-full reveal">
+            <button onclick="updateUI('home')" class="triage-btn active" id="btn-home">Home</button>
+            <button onclick="updateUI('work')" class="triage-btn" id="btn-work">Work</button>
+            <button onclick="updateUI('car')" class="triage-btn" id="btn-car">Car</button>
+            <button onclick="updateUI('street')" class="triage-btn" id="btn-street">Street</button>
+            <button onclick="updateUI('other')" class="triage-btn" id="btn-other">Other</button>
+        </div>
+
+        <div id="protocol-card" class="glass-card mb-8 reveal">
+            <h2 id="p-title" class="text-3xl font-black mb-6 uppercase tracking-tight">At Home</h2>
+            
+            <div id="p-context" class="space-y-4 mb-8">
+                </div>
+
+            <div class="border-t border-zinc-200 dark:border-zinc-800 pt-8 mt-8 space-y-6">
+                <div class="universal-rule">
+                    <p class="font-black text-sm uppercase tracking-widest text-red-600 mb-1">Rule: Silence</p>
+                    <p class="text-sm opacity-70">Remain silent. You do not have to answer any questions about your status or origin. Say: "I am exercising my 5th amendment right."</p>
+                </div>
+
+                <div class="universal-rule">
+                    <p class="font-black text-sm uppercase tracking-widest text-red-600 mb-1">Rule: No Consent</p>
+                    <p class="text-sm opacity-70">Do not consent to a search of your person, your car, or your home. Say: "I do not consent to a search."</p>
+                </div>
+
+                <div class="universal-rule">
+                    <p class="font-black text-sm uppercase tracking-widest text-red-600 mb-1">Rule: No Signature</p>
+                    <p class="text-sm opacity-70">Never sign any documents you do not understand. Ask for a lawyer immediately. Signing can mean waiving your right to a hearing.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card mb-8 reveal">
+            <h3 class="text-[10px] font-black uppercase tracking-[0.2em] mb-8 opacity-40">Rule: Document Everything</h3>
+            <div class="space-y-5">
+                <input type="text" id="log-name" placeholder="Agent Name(s)" class="w-full bg-transparent border-b border-zinc-200 dark:border-zinc-800 py-3 outline-none">
+                <input type="text" id="log-badge" placeholder="Badge Number(s)" class="w-full bg-transparent border-b border-zinc-200 dark:border-zinc-800 py-3 outline-none">
+                <input type="text" id="log-plate" placeholder="Vehicle License Plate" class="w-full bg-transparent border-b border-zinc-200 dark:border-zinc-800 py-3 outline-none">
+                <textarea id="log-notes" placeholder="Notes on behavior, location, or threats..." class="w-full bg-transparent border-b border-zinc-200 dark:border-zinc-800 py-3 outline-none h-24 resize-none"></textarea>
+                <button onclick="saveLog()" class="w-full bg-red-600 text-white py-5 rounded-3xl font-black text-lg shadow-xl active:scale-95 transition-all">SAVE RECORD</button>
+            </div>
+        </div>
+
+        <a href="records.html" class="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 hover:opacity-100 transition-opacity mb-20">Device History →</a>
+    </div>
+
+    <script>
+        const protocols = {
+            home: {
+                title: "At Home",
+                html: `
+                    <p class="font-black text-red-600 uppercase text-xs">Primary Protocol</p>
+                    <p class="font-bold text-lg">DO NOT OPEN THE DOOR.</p>
+                    <p class="text-sm opacity-70">ICE cannot enter without a judicial warrant signed by a judge. Administrative warrants (Form I-200/205) ARE NOT ENOUGH.</p>
+                    
+                    <div class="warrant-box">
+                        <p class="text-[10px] font-bold uppercase mb-2">Check for Judge's Signature</p>
+                        
+                    </div>
+
+                    <p class="font-bold">Verify through glass or under door.</p>
+                    <p class="text-sm opacity-70">Ask them to hold it to a window or slide it under. NEVER open the door to "talk."</p>
+
+                    <p class="font-black text-red-600 uppercase text-xs mt-4">The ICE Lie</p>
+                    <p class="text-sm opacity-70 italic">They will claim the warrant is "in the car" or they are "getting it now." Do not believe them. If they have it, they must show it BEFORE you open the door.</p>
+                `
+            },
+            work: {
+                title: "At Work",
+                html: `
+                    <p class="font-bold text-lg">STAY CALM. DO NOT RUN.</p>
+                    <p class="text-sm opacity-70">Running gives them "reasonable suspicion" to chase and detain you. Walk calmly to an exit.</p>
+                    <p class="font-bold mt-4 text-lg">ASK: "AM I FREE TO GO?"</p>
+                    <p class="text-sm opacity-70">If they say yes, walk away. If they say no, invoke your right to silence immediately.</p>
+                `
+            },
+            car: {
+                title: "In My Car",
+                html: `
+                    <p class="font-bold text-lg">HANDS ON THE WHEEL.</p>
+                    <p class="text-sm opacity-70">Keep hands visible at all times. Show license and registration if asked.</p>
+                    <p class="font-bold mt-4 text-lg text-red-600">REFUSE THE SEARCH.</p>
+                    <p class="text-sm opacity-70">Say: "I do not consent to a search of this vehicle." They may still search, but your spoken refusal protects your rights in court later.</p>
+                `
+            },
+            street: {
+                title: "On Street",
+                html: `
+                    <p class="font-bold text-lg">KEEP HANDS VISIBLE.</p>
+                    <p class="text-sm opacity-70">Do not reach into pockets or bags suddenly. Ask: "Am I being detained?"</p>
+                    <p class="font-bold mt-4 text-lg">ID RIGHTS.</p>
+                    <p class="text-sm opacity-70">In most states, you do not need to show ID unless you are being arrested for a specific crime. Do not answer questions about your status.</p>
+                `
+            },
+            other: {
+                title: "General",
+                html: `
+                    <p class="font-bold text-lg">BE A WITNESS.</p>
+                    <p class="text-sm opacity-70">If you see an arrest, record from a safe distance. Do not interfere physically. Note the time, location, and agent names.</p>
+                    <p class="font-bold mt-4 text-lg text-red-600">THE GOLDEN RULE.</p>
+                    <p class="text-sm opacity-70">Do not lie. If you cannot answer truthfully, remain silent. False information is a criminal offense; silence is a right.</p>
+                `
+            }
+        };
+
+        function updateUI(key) {
+            const data = protocols[key];
+            document.getElementById('p-title').innerText = data.title;
+            document.getElementById('p-context').innerHTML = data.html;
+            document.querySelectorAll('.triage-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${key}`).classList.add('active');
+            
+            const card = document.getElementById('protocol-card');
+            card.style.animation = 'none';
+            void card.offsetWidth;
+            card.style.animation = 'slideUp 0.5s cubic-bezier(0.15, 0, 0.15, 1) forwards';
+        }
+
+        function toggleMode() {
+            document.body.classList.toggle('dark');
+            localStorage.setItem('witness_theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+        }
+
+        if (localStorage.getItem('witness_theme') === 'dark') {
+            document.body.classList.add('dark');
+            document.getElementById('mode-toggle').checked = true;
+        }
+
+        function saveLog() {
+            const log = {
+                id: Date.now(),
+                date: new Date().toLocaleString(),
+                name: document.getElementById('log-name').value,
+                badge: document.getElementById('log-badge').value,
+                plate: document.getElementById('log-plate').value,
+                notes: document.getElementById('log-notes').value
+            };
+            if(!log.name && !log.badge && !log.plate && !log.notes) return;
+            const logs = JSON.parse(localStorage.getItem('witness_logs') || '[]');
+            logs.unshift(log);
+            localStorage.setItem('witness_logs', JSON.stringify(logs));
+            alert("Record locked to device.");
+            ['log-name', 'log-badge', 'log-plate', 'log-notes'].forEach(id => document.getElementById(id).value = '');
+        }
+
+        updateUI('home');
+    </script>
+</body>
+</html>

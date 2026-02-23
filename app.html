@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Witness | Install</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#FF3B30">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --apple-red: #FF3B30; --bg: #fbfbfd; --text: #1c1c1e; --card: rgba(255, 255, 255, 0.75); --border: rgba(0,0,0,0.08); }
+        .dark { --bg: #000000; --text: #ffffff; --card: rgba(28, 28, 30, 0.85); --border: rgba(255, 255, 255, 0.12); }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; transition: background 0.5s ease; }
+        .page-container { max-width: 600px; margin: 0 auto; }
+        .glass-card { background: var(--card); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid var(--border); border-radius: 2.5rem; padding: 2.5rem; }
+        .step-pill { background: var(--apple-red); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; flex-shrink: 0; }
+    </style>
+</head>
+<body class="p-6">
+
+    <div class="page-container">
+        <header class="mb-12 flex justify-between items-center">
+            <a href="index.html" class="font-black text-xl uppercase tracking-tighter">Witness</a>
+            <div class="w-2 h-2 bg-emerald-500 rounded-full"></div>
+        </header>
+
+        <h1 class="text-4xl font-black uppercase mb-6 tracking-tight">Censorship Proof</h1>
+        <p class="text-zinc-500 mb-10 leading-relaxed font-medium">
+            Witness is a <span class="text-black dark:text-white font-bold">Progressive Web App (PWA)</span>. 
+            Unlike traditional apps, it cannot be "taken down" by Apple or Google. By adding it to your home screen, you ensure it stays on your device regardless of corporate or government pressure.
+        </p>
+
+        <div id="ios-guide" class="glass-card mb-6 hidden">
+            <h2 class="font-black text-lg uppercase mb-6 flex items-center gap-2">
+                <span>Install on iPhone</span>
+                <span class="text-[10px] bg-zinc-200 dark:bg-zinc-800 px-2 py-1 rounded">Safari</span>
+            </h2>
+            <div class="space-y-8">
+                <div class="flex gap-4">
+                    <div class="step-pill">1</div>
+                    <p class="text-sm font-medium">Tap the <span class="text-blue-600 font-bold">Share</span> button at the bottom of Safari.</p>
+                </div>
+                <div class="flex gap-4">
+                    <div class="step-pill">2</div>
+                    <p class="text-sm font-medium">Scroll down and select <span class="font-bold">"Add to Home Screen"</span>.</p>
+                </div>
+                <div class="flex gap-4">
+                    <div class="step-pill">3</div>
+                    <p class="text-sm font-medium">Tap <span class="text-blue-600 font-bold">Add</span> in the top right corner.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="android-guide" class="glass-card mb-6 hidden">
+            <h2 class="font-black text-lg uppercase mb-6 flex items-center gap-2">
+                <span>Install on Android</span>
+                <span class="text-[10px] bg-zinc-200 dark:bg-zinc-800 px-2 py-1 rounded">Chrome</span>
+            </h2>
+            <div class="space-y-8">
+                <div class="flex gap-4">
+                    <div class="step-pill">1</div>
+                    <p class="text-sm font-medium">Tap the <span class="font-bold">three dots (⋮)</span> in the top right of Chrome.</p>
+                </div>
+                <div class="flex gap-4">
+                    <div class="step-pill">2</div>
+                    <p class="text-sm font-medium">Select <span class="font-bold">"Install App"</span> or "Add to Home Screen".</p>
+                </div>
+                <div class="flex gap-4">
+                    <div class="step-pill">3</div>
+                    <p class="text-sm font-medium">Confirm by tapping <span class="text-blue-600 font-bold">Install</span>.</p>
+                </div>
+            </div>
+        </div>
+
+        <p class="text-[10px] font-black uppercase tracking-widest text-zinc-400 text-center mt-12 px-10">
+            Witness functions as a standalone application once saved to your device.
+        </p>
+    </div>
+
+    <script>
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isAndroid = /Android/.test(navigator.userAgent);
+
+        if (isIOS) document.getElementById('ios-guide').classList.remove('hidden');
+        else document.getElementById('android-guide').classList.remove('hidden');
+
+        if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+    </script>
+</body>
+</html>
