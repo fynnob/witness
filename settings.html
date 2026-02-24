@@ -13,20 +13,15 @@
     <style>
         :root { --apple-red: #FF3B30; --bg: #fbfbfd; --text: #1c1c1e; --card: rgba(255, 255, 255, 0.75); --border: rgba(0, 0, 0, 0.08); --btn-bg: #1c1c1e; --btn-text: #ffffff; }
         .dark { --bg: #000000; --text: #ffffff; --card: rgba(28, 28, 30, 0.85); --border: rgba(255, 255, 255, 0.12); --btn-bg: #ffffff; --btn-text: #000000; }
-        
         body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; transition: background 0.4s ease; }
         .page-container { max-width: 600px; margin: 0 auto; padding-bottom: 100px; }
-        .glass-card { background: var(--card); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid var(--border); border-radius: 2rem; padding: 2rem; width: 100%; }
-        
+        .glass-card { background: var(--card); backdrop-filter: blur(25px); border: 1px solid var(--border); border-radius: 2rem; padding: 2rem; width: 100%; }
         #mini-map { height: 220px; width: 100%; border-radius: 1.5rem; margin-top: 1.5rem; border: 1px solid var(--border); display: none; }
         .dark .leaflet-tile { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
-
-        .btn-main { background: var(--btn-bg); color: var(--btn-text); padding: 16px; rounded-2xl: 1.25rem; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; width: 100%; transition: all 0.2s; }
+        .btn-main { background: var(--btn-bg); color: var(--btn-text); padding: 16px; border-radius: 1.25rem; font-weight: 800; font-size: 14px; text-transform: uppercase; width: 100%; transition: all 0.2s; }
         .btn-secondary { background: rgba(120, 120, 128, 0.16); color: var(--text); padding: 16px; border-radius: 1.25rem; font-weight: 800; font-size: 14px; text-transform: uppercase; width: 100%; }
-        
-        #search-results { position: absolute; width: 100%; z-index: 100; top: 100%; background: var(--card); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 1rem; overflow: hidden; margin-top: 4px; }
+        #search-results { position: absolute; width: 100%; z-index: 100; top: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 1rem; overflow: hidden; margin-top: 4px; }
         .search-item { padding: 14px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
-
         .step-hidden { display: none !important; }
     </style>
 </head>
@@ -49,7 +44,6 @@
             <div id="zone-list" class="space-y-3 mb-10"></div>
 
             <div id="add-ui" class="pt-6 border-t border-zinc-100 dark:border-zinc-900">
-                
                 <div id="step-1" class="space-y-4">
                     <div class="relative">
                         <input type="text" id="search-input" placeholder="Search address..." class="w-full bg-transparent border-b border-zinc-200 py-3 outline-none text-sm font-medium">
@@ -60,13 +54,9 @@
 
                 <div id="step-2" class="step-hidden space-y-4">
                     <div id="mini-map"></div>
-                    <input type="text" id="zone-name-input" placeholder="Give this zone a name (e.g. Home)" class="w-full bg-transparent border-b border-zinc-200 py-3 outline-none text-sm font-medium">
-                    <div class="flex gap-2">
-                        <button onclick="resetFlow()" class="btn-secondary">Back</button>
-                        <button onclick="confirmAndSaveZone()" class="btn-main" style="background: var(--apple-red); color: white;">Confirm & Save</button>
-                    </div>
+                    <input type="text" id="zone-name-input" placeholder="Zone name (e.g. Home)" class="w-full bg-transparent border-b border-zinc-200 py-3 outline-none text-sm font-medium">
+                    <button onclick="confirmAndSaveZone()" class="btn-main" id="final-save-btn" style="background: var(--apple-red); color: white;">Confirm & Save</button>
                 </div>
-
             </div>
         </div>
 
@@ -77,11 +67,15 @@
     </div>
 
     <script>
+        const PUBLIC_VAPID_KEY = 'BCI6GDfRfz4SVCfbRqmOzKoVsMmuEQienFFDew4F2hwELLSH9CJ0nlKlFcfMc9BtHuOgbWTY66pfgcCngOwEYH4';
         const supabaseUrl = "https://qburnwsfauymwwwpmjoo.supabase.co";
         const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFidXJud3NmYXV5bXd3d3Btam9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NDk2MzUsImV4cCI6MjA4NzMyNTYzNX0.auc2wgNolEGIsIzUsEfTgyVPS-whImFRxePCtmDBbTA";
 
+        console.log("[INIT] System starting...");
+
         if (!localStorage.getItem('witness_device_id')) {
             localStorage.setItem('witness_device_id', crypto.randomUUID());
+            console.log("[INIT] New Device ID generated:", localStorage.getItem('witness_device_id'));
         }
         const deviceID = localStorage.getItem('witness_device_id');
 
@@ -89,23 +83,102 @@
             global: { headers: { 'x-device-id': deviceID } }
         });
 
-        let miniMap, selectionMarker, selectedCoords = null;
-        let zones = [];
+        let miniMap, selectionMarker, selectedCoords = null, zones = [];
 
-        // FLOW CONTROL
-        function resetFlow() {
-            document.getElementById('step-1').classList.remove('step-hidden');
-            document.getElementById('step-2').classList.add('step-hidden');
-            document.getElementById('mini-map').style.display = 'none';
-            selectedCoords = null;
+        // --- PWA PUSH HANDSHAKE WITH LOGS ---
+        async function getPushSubscription() {
+            console.log("[PUSH] Checking Service Worker status...");
+            const registration = await navigator.serviceWorker.ready;
+            
+            if (!registration) {
+                console.error("[PUSH_ERR_01] Service Worker not ready.");
+                throw new Error("SW_NOT_READY");
+            }
+
+            console.log("[PUSH] Requesting/Checking subscription...");
+            let subscription = await registration.pushManager.getSubscription();
+            
+            if (!subscription) {
+                console.log("[PUSH] No existing subscription. Creating new one with VAPID key...");
+                try {
+                    subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
+                    });
+                    console.log("[PUSH] New subscription created successfully.");
+                } catch (e) {
+                    console.error("[PUSH_ERR_02] Subscription failed:", e.message, e.code);
+                    throw e;
+                }
+            }
+            return JSON.stringify(subscription);
         }
 
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+            return outputArray;
+        }
+
+        // --- SAVE FLOW WITH DETAILED ERROR LOGGING ---
+        async function confirmAndSaveZone() {
+            const btn = document.getElementById('final-save-btn');
+            const name = document.getElementById('zone-name-input').value.trim();
+            
+            if (!name) {
+                console.warn("[SAVE_VAL] Zone name missing.");
+                return alert("Please enter a name for this zone.");
+            }
+            
+            btn.innerText = "PROCESSING...";
+            btn.disabled = true;
+
+            try {
+                console.log("[SAVE] Step 1: Generating Push Token...");
+                const token = await getPushSubscription();
+                const tokenJson = JSON.parse(token);
+
+                console.log("[SAVE] Step 2: Sending to Supabase...");
+                const payload = {
+                    device_id: deviceID,
+                    zone_name: name,
+                    lat_int: Math.floor(selectedCoords.lat),
+                    lon_int: Math.floor(selectedCoords.lon),
+                    lat_decimal: selectedCoords.lat,
+                    lon_decimal: selectedCoords.lon,
+                    push_token: tokenJson
+                };
+                console.log("[SAVE] Payload prepared:", payload);
+
+                const { data, error, status } = await sb.from('subscriptions').insert([payload]);
+
+                if (error) {
+                    console.error("[SAVE_ERR_DB] Supabase rejected insert. Code:", error.code, "Status:", status, "Msg:", error.message);
+                    alert(`Database Error (${error.code}): ${error.message}`);
+                } else {
+                    console.log("[SAVE_SUCCESS] Zone stored in cloud. Status:", status);
+                    alert("Watch Zone Active.");
+                    location.reload();
+                }
+            } catch (err) {
+                console.error("[SAVE_ERR_CRITICAL] Handshake/Auth Failure:", err);
+                alert("Installation Error: Make sure the app is installed to your home screen.");
+            } finally {
+                btn.innerText = "CONFIRM & SAVE";
+                btn.disabled = false;
+            }
+        }
+
+        // --- MAP & UI UTILS ---
         function proceedToStep2(lat, lon, defaultName = "") {
+            console.log("[UI] Moving to Step 2 at:", lat, lon);
             selectedCoords = { lat, lon };
             document.getElementById('step-1').classList.add('step-hidden');
             document.getElementById('step-2').classList.remove('step-hidden');
             document.getElementById('zone-name-input').value = defaultName;
-            
             initMiniMap(lat, lon);
         }
 
@@ -114,84 +187,24 @@
             if (!miniMap) {
                 miniMap = L.map('mini-map', { zoomControl: false, attributionControl: false }).setView([lat, lon], 18);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(miniMap);
-            } else {
-                miniMap.setView([lat, lon], 18);
-            }
+            } else miniMap.setView([lat, lon], 18);
             if (selectionMarker) miniMap.removeLayer(selectionMarker);
             selectionMarker = L.marker([lat, lon]).addTo(miniMap);
-            setTimeout(() => miniMap.invalidateSize(), 100);
+            setTimeout(() => {
+                miniMap.invalidateSize();
+                console.log("[UI] Mini-map refreshed.");
+            }, 150);
         }
 
-        // LOCATION SEARCH
-        const searchInput = document.getElementById('search-input');
-        const resultsBox = document.getElementById('search-results');
-
-        searchInput.addEventListener('input', (e) => {
-            const query = e.target.value;
-            if (query.length < 3) return resultsBox.classList.add('hidden');
-            const s = document.createElement('script');
-            s.src = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&json_callback=handleSearch`;
-            document.body.appendChild(s);
-            document.body.removeChild(s);
-        });
-
-        window.handleSearch = function(data) {
-            resultsBox.innerHTML = '';
-            if (!data.length) return;
-            resultsBox.classList.remove('hidden');
-            data.forEach(p => {
-                const div = document.createElement('div');
-                div.className = 'search-item hover:bg-zinc-100 dark:hover:bg-zinc-800';
-                div.innerText = p.display_name;
-                div.onclick = () => {
-                    resultsBox.classList.add('hidden');
-                    proceedToStep2(parseFloat(p.lat), parseFloat(p.lon), p.display_name.split(',')[0]);
-                };
-                resultsBox.appendChild(div);
-            });
-        };
-
-        function useCurrentLocation() {
-            navigator.geolocation.getCurrentPosition(pos => {
-                proceedToStep2(pos.coords.latitude, pos.coords.longitude, "My Current Location");
-            }, err => alert("Please enable location access."));
-        }
-
-        // BACKEND BURST
         async function fetchZones() {
-            const { data, error } = await sb.from('subscriptions').select('*').eq('device_id', deviceID);
-            if (data) { zones = data; renderZones(); }
-            if (error) console.error("Fetch failed:", error.message);
-        }
-
-        async function confirmAndSaveZone() {
-            const name = document.getElementById('zone-name-input').value.trim();
-            if (!name) return alert("Please enter a name.");
-            if (zones.length >= 5) return alert("Limit of 5 zones reached.");
-
-            const burstData = {
-                device_id: deviceID,
-                zone_name: name,
-                lat_int: Math.floor(selectedCoords.lat),
-                lon_int: Math.floor(selectedCoords.lon),
-                lat_decimal: selectedCoords.lat,
-                lon_decimal: selectedCoords.lon,
-                push_token: "WEB_BURST_VERIFIED"
-            };
-
-            const { error } = await sb.from('subscriptions').insert([burstData]);
-
-            if (error) {
-                alert("Error: " + error.message);
-            } else {
-                resetFlow();
-                fetchZones(); // Verify it works by re-fetching
+            console.log("[DB] Fetching active zones for device...");
+            const { data, error, status } = await sb.from('subscriptions').select('*').eq('device_id', deviceID);
+            if (error) console.error("[DB_ERR_FETCH] Code:", error.code, "Msg:", error.message);
+            if (data) { 
+                zones = data; 
+                console.log("[DB] Zones loaded:", zones.length);
+                renderZones(); 
             }
-        }
-
-        async function deleteZone(id) {
-            const { error } = await sb.from('subscriptions').delete().eq('id', id);
-            if (!error) fetchZones();
         }
 
         function renderZones() {
@@ -205,17 +218,52 @@
             `).join('');
         }
 
-        // THEME
+        async function deleteZone(id) {
+            console.log("[DB] Deleting zone:", id);
+            const { error } = await sb.from('subscriptions').delete().eq('id', id);
+            if (error) console.error("[DB_ERR_DEL]", error);
+            fetchZones();
+        }
+
+        function useCurrentLocation() {
+            console.log("[GEO] Requesting current position...");
+            navigator.geolocation.getCurrentPosition(
+                pos => proceedToStep2(pos.coords.latitude, pos.coords.longitude, "Current Location"),
+                err => {
+                    console.error("[GEO_ERR] Code:", err.code, "Msg:", err.message);
+                    alert("Location access denied.");
+                }
+            );
+        }
+
+        const searchInput = document.getElementById('search-input');
+        const resultsBox = document.getElementById('search-results');
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            if (query.length < 3) return resultsBox.classList.add('hidden');
+            const s = document.createElement('script');
+            s.src = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&json_callback=handleSearch`;
+            document.body.appendChild(s);
+            document.body.removeChild(s);
+        });
+        window.handleSearch = (data) => {
+            resultsBox.innerHTML = '';
+            if (!data.length) return resultsBox.classList.add('hidden');
+            resultsBox.classList.remove('hidden');
+            data.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'search-item';
+                div.innerText = p.display_name;
+                div.onclick = () => { resultsBox.classList.add('hidden'); proceedToStep2(parseFloat(p.lat), parseFloat(p.lon), p.display_name.split(',')[0]); };
+                resultsBox.appendChild(div);
+            });
+        };
+
         function toggleMode() {
             document.body.classList.toggle('dark');
-            const isDark = document.body.classList.contains('dark');
-            document.getElementById('theme-icon').innerText = isDark ? "☀️" : "🌙";
-            localStorage.setItem('witness_theme', isDark ? 'dark' : 'light');
+            localStorage.setItem('witness_theme', document.body.classList.contains('dark') ? 'dark' : 'light');
         }
-        if (localStorage.getItem('witness_theme') === 'dark') {
-            document.body.classList.add('dark');
-            document.getElementById('theme-icon').innerText = "☀️";
-        }
+        if (localStorage.getItem('witness_theme') === 'dark') document.body.classList.add('dark');
 
         fetchZones();
     </script>

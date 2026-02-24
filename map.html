@@ -16,41 +16,53 @@
         body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); overflow: hidden; font-family: -apple-system, sans-serif; transition: background 0.4s ease; }
         #map { position: absolute; inset: 0; z-index: 1; }
         
-        /* Map Filtering for Dark Mode */
         .dark .leaflet-tile { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
-        .leaflet-tile { transition: filter 0.5s ease; }
-
-        /* UI Overlays */
         .glass { background: var(--glass); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid var(--border); color: var(--text); }
         .map-ui { pointer-events: none; z-index: 1000; position: absolute; inset: 0; padding-top: env(safe-area-inset-top); }
         .map-ui > * { pointer-events: auto; }
 
-        /* Tactical Report Button & Cooldown */
-        .report-btn { position: relative; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .filter-pill { padding: 8px 14px; border-radius: 20px; font-size: 11px; font-weight: 800; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-transform: uppercase; }
+        .f-active { background: #1c1c1e; color: #fff; }
+        .dark .f-active { background: #fff; color: #000; }
+        .f-inactive { background: var(--glass); color: #8e8e93; border: 1px solid var(--border); }
+
+        .report-btn { position: relative; overflow: hidden; transition: all 0.3s; }
         .report-btn.cooldown { background: #000 !important; pointer-events: none; }
-        #cooldown-bar { position: absolute; top: 0; right: 0; height: 100%; background: #ef4444; width: 0%; transition: none; opacity: 0.3; }
+        #cooldown-bar { position: absolute; top: 0; right: 0; height: 100%; background: #ef4444; width: 0%; opacity: 0.4; }
 
         .user-dot { width: 18px; height: 18px; background: var(--apple-blue); border: 3px solid white; border-radius: 50%; box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3); }
+        
+        #search-results { position: absolute; width: 100%; z-index: 100; top: 100%; background: var(--glass); backdrop-filter: blur(15px); border: 1px solid var(--border); border-radius: 1.5rem; overflow: hidden; margin-top: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .search-item { padding: 14px 16px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 14px; font-weight: 600; text-align: left; }
     </style>
 </head>
 <body>
 
     <div id="map"></div>
 
-    <div class="map-ui flex flex-col items-center h-full">
+    <div class="map-ui flex flex-col items-center">
         <div class="w-full max-w-md px-5 mt-4 flex flex-col gap-3">
-            <div class="glass rounded-2xl flex items-center px-4 py-1 shadow-lg">
-                <input type="text" id="search-input" placeholder="Search area..." class="w-full bg-transparent border-none focus:ring-0 px-3 py-3.5 text-sm font-bold outline-none">
+            <div class="glass rounded-2xl flex items-center px-4 py-1 shadow-lg relative w-full">
+                <input type="text" id="search-input" placeholder="Search any location..." class="w-full bg-transparent border-none focus:ring-0 px-3 py-3.5 text-sm font-bold outline-none">
                 <button onclick="toggleDarkMode()" class="p-2 opacity-50">🌓</button>
+                <div id="search-results" class="hidden"></div>
+            </div>
+
+            <div class="flex gap-2 justify-center">
+                <button onclick="setTimeFilter(0.16, '10m')" class="filter-pill f-inactive" id="f-10m">10m</button>
+                <button onclick="setTimeFilter(0.5, '30m')" class="filter-pill f-inactive" id="f-30m">30m</button>
+                <button onclick="setTimeFilter(1, '1h')" class="filter-pill f-active" id="f-1h">1h</button>
+                <button onclick="setTimeFilter(3, '3h')" class="filter-pill f-inactive" id="f-3h">3h</button>
+                <button onclick="setTimeFilter(6, '6h')" class="filter-pill f-inactive" id="f-6h">6h</button>
             </div>
         </div>
 
         <div class="absolute top-1/2 -translate-y-1/2 right-4 flex flex-col gap-4">
             <div class="flex flex-col glass rounded-2xl shadow-xl overflow-hidden">
-                <button onclick="map.zoomIn()" class="w-12 h-12 flex items-center justify-center border-b border-black/5">+</button>
-                <button onclick="map.zoomOut()" class="w-12 h-12 flex items-center justify-center">-</button>
+                <button onclick="map.zoomIn()" class="w-12 h-12 flex items-center justify-center border-b border-black/5 font-bold">+</button>
+                <button onclick="map.zoomOut()" class="w-12 h-12 flex items-center justify-center font-bold">-</button>
             </div>
-            <button onclick="centerOnUser()" class="w-12 h-12 glass rounded-2xl flex items-center justify-center shadow-xl">📍</button>
+            <button onclick="centerOnUser()" class="w-12 h-12 glass rounded-2xl flex items-center justify-center shadow-xl text-lg">📍</button>
         </div>
 
         <div class="absolute bottom-10 w-full px-8 flex justify-center">
@@ -63,122 +75,183 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/simpleheat@0.4.0/simpleheat.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     
     <script>
         const supabaseUrl = "https://qburnwsfauymwwwpmjoo.supabase.co";
         const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFidXJud3NmYXV5bXd3d3Btam9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NDk2MzUsImV4cCI6MjA4NzMyNTYzNX0.auc2wgNolEGIsIzUsEfTgyVPS-whImFRxePCtmDBbTA";
         const sb = supabase.createClient(supabaseUrl, supabaseKey);
 
-        // --- MAP CONFIG ---
-        const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true })
-                     .setView([38.5, -98.0], 4);
-
+        const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([38.5, -98.0], 4);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png').addTo(map);
 
-        let userMarker, currentCoords;
-        let isCooldown = false;
+        // --- HIGH QUALITY HEATMAP ENGINE ---
+        const HeatLayer = L.Layer.extend({
+            onAdd: function(map) {
+                this._canvas = L.DomUtil.create('canvas', 'leaflet-heatmap-layer');
+                const size = map.getSize();
+                this._canvas.width = size.x; this._canvas.height = size.y;
+                map.getPanes().overlayPane.appendChild(this._canvas);
+                this._heat = simpleheat(this._canvas).gradient({ 0.4: '#007AFF', 0.6: '#5AC8FA', 0.8: '#FFCC00', 1.0: '#FF3B30' }).max(5);
+                map.on('move', this._reset, this); this._reset();
+            },
+            _reset: function() { const pos = this._map.containerPointToLayerPoint([0, 0]); L.DomUtil.setPosition(this._canvas, pos); this.redraw(); },
+            redraw: function() {
+                if (!this._data || !this._map) return;
+                const size = this._map.getSize();
+                this._canvas.width = size.x; this._canvas.height = size.y;
+                const r = Math.max(12, this._map.getZoom() * 3);
+                this._heat.radius(r, r * 0.7);
+                const data = this._data.map(p => { const pt = this._map.latLngToContainerPoint([p[0], p[1]]); return [pt.x, pt.y, p[2]]; });
+                this._heat.data(data).draw(0.1);
+            },
+            setData: function(d) { this._data = d; this.redraw(); }
+        });
+        const heatmapLayer = new HeatLayer().addTo(map);
 
-        // --- DARK MODE LOGIC ---
+        let userMarker, currentCoords, isCooldown = false, selectedTimeLimit = 1;
+        let tacticalGroup = L.layerGroup().addTo(map);
+        let searchMarker = null, originalState = null;
+
         function toggleDarkMode() {
             document.body.classList.toggle('dark');
             localStorage.setItem('witness_theme', document.body.classList.contains('dark') ? 'dark' : 'light');
         }
         if (localStorage.getItem('witness_theme') === 'dark') document.body.classList.add('dark');
 
-        // --- GPS ---
+        // --- SEARCH ENGINE: GLOBAL WITH LOCAL BIAS ---
+        const searchInput = document.getElementById('search-input');
+        const searchResults = document.getElementById('search-results');
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            if (query.length === 0) { 
+                if (originalState) { map.flyTo(originalState.center, originalState.zoom); originalState = null; }
+                if (searchMarker) { map.removeLayer(searchMarker); searchMarker = null; }
+                searchResults.classList.add('hidden'); return;
+            }
+            if (query.length < 3) return;
+            const bounds = map.getBounds();
+            const viewbox = `${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()},${bounds.getSouth()}`;
+            const s = document.createElement('script');
+            // Global search: bounded=0 ensures it looks outside the screen if nothing local matches
+            s.src = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&viewbox=${viewbox}&bounded=0&json_callback=handleSearch`;
+            document.body.appendChild(s);
+            document.body.removeChild(s);
+        });
+
+        window.handleSearch = function(data) {
+            searchResults.innerHTML = '';
+            if (!data.length) return searchResults.classList.add('hidden');
+            searchResults.classList.remove('hidden');
+            
+            // Logic: Drop pin even if results are small
+            data.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'search-item hover:bg-black/5 dark:hover:bg-white/5';
+                div.innerText = p.display_name;
+                div.onclick = () => {
+                    if (!originalState) originalState = { center: map.getCenter(), zoom: map.getZoom() };
+                    if (searchMarker) map.removeLayer(searchMarker);
+                    searchMarker = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: '', html: `<div style="background:#000; border:2px solid #FFCC00; width:14px; height:14px; border-radius:50%;"></div>`, iconSize: [14, 14], iconAnchor: [7, 7] })}).addTo(map);
+                    map.flyTo([p.lat, p.lon], 16);
+                    searchResults.classList.add('hidden');
+                };
+                searchResults.appendChild(div);
+            });
+        };
+
+        // --- TACTICAL PATH PREDICTION (FUZZY BUFFER: 150m) ---
+        function calculateTacticalPaths(points) {
+            tacticalGroup.clearLayers();
+            if (points.length < 3) return;
+            const sorted = points.sort((a,b) => a.ts - b.ts);
+            let cur = [sorted[0]];
+            for (let i = 1; i < sorted.length; i++) {
+                // Buffer increased to 1500m for chain grouping, 150m for regression "noise"
+                if (map.distance([sorted[i].lat, sorted[i].lon], [sorted[i-1].lat, sorted[i-1].lon]) < 1500) {
+                    cur.push(sorted[i]);
+                } else {
+                    if (cur.length >= 3) drawPrediction(cur);
+                    cur = [sorted[i]];
+                }
+            }
+            if (cur.length >= 3) drawPrediction(cur);
+        }
+
+        function drawPrediction(c) {
+            const last = c[c.length-1];
+            L.polyline(c.map(p => [p.lat, p.lon]), { color: '#8e8e93', weight: 2, opacity: 0.4 }).addTo(tacticalGroup);
+            
+            // Least Squares Regression for Directional Vector
+            let n = c.length, sumX = 0, sumYLa = 0, sumYLo = 0, sumXX = 0, sumXYLa = 0, sumXYLo = 0;
+            const startTs = c[0].ts;
+            c.forEach(p => {
+                const x = (p.ts - startTs) / 1000;
+                sumX += x; sumYLa += p.lat; sumYLo += p.lon; sumXX += x*x; sumXYLa += x*p.lat; sumXYLo += x*p.lon;
+            });
+            const det = n * sumXX - sumX * sumX;
+            if (det === 0) return;
+            const slopeLa = (n * sumXYLa - sumX * sumYLa) / det;
+            const slopeLo = (n * sumXYLo - sumX * sumYLo) / det;
+
+            // Predict 15 minutes (900s) ahead
+            const pLat = last.lat + (slopeLa * 900);
+            const pLon = last.lon + (slopeLo * 900);
+
+            L.polyline([[last.lat, last.lon], [pLat, pLon]], { color: '#ff3b30', weight: 3, dashArray: '5, 10' }).addTo(tacticalGroup);
+            L.circleMarker([pLat, pLon], { radius: 6, color: '#ff3b30', fillColor: '#ff3b30', fillOpacity: 1 }).addTo(tacticalGroup);
+        }
+
+        async function fetchBurst() {
+            const center = map.getCenter();
+            const timeAgo = new Date(Date.now() - (selectedTimeLimit * 3600000)).toISOString();
+            const shards = [[Math.floor(center.lat), Math.floor(center.lng)], [Math.floor(center.lat)+1, Math.floor(center.lng)], [Math.floor(center.lat)-1, Math.floor(center.lng)], [Math.floor(center.lat), Math.floor(center.lng)+1], [Math.floor(center.lat), Math.floor(center.lng)-1]];
+            
+            let pts = [], raw = [];
+            for (const [lat, lon] of shards) {
+                const { data } = await sb.from('reports').select('lat_decimal, lon_decimal, created_at').eq('lat_int', lat).eq('lon_int', lon).gt('created_at', timeAgo);
+                if (data) data.forEach(d => {
+                    pts.push([d.lat_decimal, d.lon_decimal, 1]);
+                    raw.push({ lat: d.lat_decimal, lon: d.lon_decimal, ts: new Date(d.created_at).getTime() });
+                });
+            }
+            heatmapLayer.setData(pts);
+            calculateTacticalPaths(raw);
+        }
+
+        function setTimeFilter(h, id) {
+            selectedTimeLimit = h;
+            document.querySelectorAll('.filter-pill').forEach(b => { b.classList.remove('f-active'); b.classList.add('f-inactive'); });
+            document.getElementById(`f-${id}`).classList.replace('f-inactive', 'f-active');
+            fetchBurst();
+        }
+
         map.on('locationfound', (e) => {
             currentCoords = e.latlng;
             if (!userMarker) {
                 userMarker = L.marker(e.latlng, { icon: L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(map);
                 map.flyTo(e.latlng, 14);
-            } else {
-                userMarker.setLatLng(e.latlng);
-            }
+            } else { userMarker.setLatLng(e.latlng); }
         });
         map.locate({ watch: true, enableHighAccuracy: true });
 
         function centerOnUser() { if (currentCoords) map.flyTo(currentCoords, 14); }
 
-        // --- SHARD DATA BURST (Efficiency Fix) ---
-        async function fetchBurst() {
-            const center = map.getCenter();
-            const now = Date.now();
-            const sixHoursAgo = new Date(now - 21600000).toISOString();
-
-            // Calculate local shards (Integer squares)
-            const shards = [
-                [Math.floor(center.lat), Math.floor(center.lng)],
-                [Math.floor(center.lat) + 1, Math.floor(center.lng)],
-                [Math.floor(center.lat) - 1, Math.floor(center.lng)],
-                [Math.floor(center.lat), Math.floor(center.lng) + 1],
-                [Math.floor(center.lat), Math.floor(center.lng) - 1]
-            ];
-
-            let allReports = [];
-            for (const [lat, lon] of shards) {
-                const { data } = await sb.from('reports')
-                                         .select('lat_decimal, lon_decimal')
-                                         .eq('lat_int', lat)
-                                         .eq('lon_int', lon)
-                                         .gt('created_at', sixHoursAgo);
-                if (data) allReports = [...allReports, ...data];
-            }
-
-            renderTacticalMarkers(allReports);
-        }
-
-        function renderTacticalMarkers(reports) {
-            // Simplified marker logic to keep performance high
-            // In production, use Leaflet.markercluster or canvas circles
-        }
-
-        // --- REPORT & COOLDOWN ---
         async function triggerReport() {
             if (isCooldown || !currentCoords) return;
-            
             isCooldown = true;
-            const btn = document.getElementById('report-master');
-            const label = document.getElementById('btn-label');
-            const bar = document.getElementById('cooldown-bar');
-
-            // 1. Data Burst to Supabase
-            const f = 0.00025;
-            const la = Math.round(currentCoords.lat/f)*f;
-            const lo = Math.round(currentCoords.lng/f)*f;
-
-            const { error } = await sb.from('reports').insert([{
-                lat_int: Math.floor(la),
-                lon_int: Math.floor(lo),
-                lat_decimal: la,
-                lon_decimal: lo
-            }]);
-
-            if (error) {
-                alert("Report failed. Check connection.");
-                isCooldown = false;
-                return;
-            }
-
-            // 2. UI Cooldown Animation
+            const btn = document.getElementById('report-master'), bar = document.getElementById('cooldown-bar');
+            const f = 0.00025, la = Math.round(currentCoords.lat/f)*f, lo = Math.round(currentCoords.lng/f)*f;
+            await sb.from('reports').insert([{ lat_int: Math.floor(la), lon_int: Math.floor(lo), lat_decimal: la, lon_decimal: lo }]);
             btn.classList.add('cooldown');
-            label.innerText = "REPORT SENT";
-            
+            document.getElementById('btn-label').innerText = "SENT";
             let progress = 0;
-            const duration = 60000; // 1 minute
-            const interval = 100;
-            
             const timer = setInterval(() => {
-                progress += (interval / duration) * 100;
-                bar.style.width = progress + "%";
-
-                if (progress >= 100) {
-                    clearInterval(timer);
-                    isCooldown = false;
-                    btn.classList.remove('cooldown');
-                    bar.style.width = "0%";
-                    label.innerText = "REPORT ICE";
-                }
-            }, interval);
+                progress += (100 / 600); bar.style.width = progress + "%";
+                if (progress >= 100) { clearInterval(timer); isCooldown = false; btn.classList.remove('cooldown'); bar.style.width = "0%"; document.getElementById('btn-label').innerText = "REPORT ICE"; }
+            }, 100);
+            fetchBurst();
         }
 
         map.on('moveend', fetchBurst);
